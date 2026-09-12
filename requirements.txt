@@ -1,4 +1,5 @@
 streamlit
+edge-tts
 firebase-admin
-elevenlabs
+supabase
 python-dotenv

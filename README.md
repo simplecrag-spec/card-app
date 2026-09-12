@@ -1,60 +1,67 @@
 # 🗣️ Voice Flashcards — AI Voice Edition
 
-Voice-enabled flashcard app with spaced repetition, AI text-to-speech, voice answers, and voice card creation.
+Voice-enabled flashcard app with AI neural TTS, voice answer checking, voice card creation, and cloud storage.
 
 ## Features
-- 🔊 **AI Voice (ElevenLabs)** — natural voices, free 10k chars/mo
-- 🎙 **Voice Answer Checking (Web Speech API)** — speak your answer, app hears it
+- 🔊 **AI Voice (Edge TTS, free & unlimited)** — Microsoft neural voices, no API key, no character limits
+- 🎙 **Voice Answer Checking (Web Speech API)** — speak your answer, app checks it
 - 🧠 **SM-2 Spaced Repetition** — Again / Hard / Good / Easy grading
-- 🔥 **"hey fresco" wake word** — voice card creation: say question, then answer
-- ☁️ **Firebase Firestore** — persistent cloud storage, works with PC off
+- 🔥 **Wake word "hey fresco"** — voice card creation flow
+- ☁️ **Supabase or Firebase** — persistent cloud storage, works with PC off
 - 📱 **Mobile-ready** — works on iOS Safari / Android Chrome
 
 ## Setup (one time)
 
-### 1. ElevenLabs voice (free)
-1. Sign up at https://elevenlabs.io (free tier: 10k characters/month)
-2. Copy your API key from Profile → API Keys
+### 1. Supabase cloud storage (recommended — easiest)
+1. Go to **[app.supabase.com](https://app.supabase.com)** → Sign up with Google or GitHub
+2. Click **New Project** → name it anything → pick a free plan → wait ~1 min
+3. Go to **SQL Editor** (left sidebar) → click **New Query**, paste:
 
-### 2. Firebase storage (free)
-1. Go to https://console.firebase.google.com → Create project
-2. Build → Firestore Database → Create database (start in "Production mode")
-3. Project Settings → **Service accounts** → Generate new private key
-   - Download the JSON file — this is your service account credential
+```sql
+create table if not exists flashcards (
+  id bigint generated always as identity primary key,
+  front text not null,
+  back text not null,
+  interval int default 1,
+  repetitions int default 0,
+  ease float default 2.5,
+  next_review text,
+  created_at timestamptz default now()
+);
+alter table flashcards disable row level security;
+```
+
+4. Click **Run**
+5. Go to **Settings** (gear icon) → **API** → copy:
+   - **Project URL** (looks like `https://abc123.supabase.co`)
+   - **anon public key** (starts with `eyJ...`)
+
+That's it! Paste both into Streamlit secrets (step below).
+
+### 2. Voice — already free & unlimited (no signup needed!)
+Edge TTS uses the same voices as Microsoft Edge's "Read Aloud." No API key, no limits.
+- **8 voices** available in the sidebar: Aria, Guy, Jenny, Ryan, Eric, Christopher, Sonia, Mia
+- Speed control in sidebar (-30% to +30%)
 
 ### 3. Streamlit secrets
-In your Streamlit Cloud app dashboard:
-1. Open **Advanced settings** → **Secrets**
-2. Paste:
+In your Streamlit Cloud app → **Manage app** → **Advanced settings** → **Secrets**, paste:
 
 ```toml
-ELEVEN_API_KEY = "your-elevenlabs-key"
-
-FIREBASE_CRED = '{"type":"service_account","project_id":"your-project","private_key":"-----BEGIN ... -----","client_email":"firebase-adminsdk@your-project.iam.gserviceaccount.com"}'
+SUPABASE_URL = "https://abc123.supabase.co"
+SUPABASE_KEY = "eyJhbGci..."
 ```
 
-> Tip: get the service account JSON into one line with: `cat your-firebase-key.json | python -c "import sys,json;print(json.dumps(json.load(sys.stdin)))"`
-
-## Deploy
+### 4. Deploy
 1. Push to GitHub
 2. Streamlit Cloud: link repo → `main` → `app.py`
-3. Set secrets (above)
-4. **First run**: In Firebase console → Firestore → Rules → set read/write to `true` (for personal use):
-
-```
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if true;
-    }
-  }
-}
-```
-
-5. Done! Open on your phone → Add to Home Screen
+3. Add secrets (above)
+4. Open on phone → **Add to Home Screen**
 
 ## Usage
 - **Review** — flip card, grade Again/Hard/Good/Easy
-- **Voice answer** — after showing answer, tap 🎙 and speak your answer
-- **Voice create** — tap *Voice Card Creation* → "hey fresco" → say question → say answer → card saved
+- **Voice answer** — after showing answer, tap 🎙, speak your answer, paste it, tap "Check Answer"
+- **Voice create** — tap "Voice Create" → say question → say answer → card saved
+- **AI voice** — automatically reads each card; speed control in sidebar
+
+## Voice wake word note
+"hey fresco" is the activation phrase. Tap the 🎤 button to activate mic (browsers require a tap for security), then say your question/answer as prompted.
