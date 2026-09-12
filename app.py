@@ -71,7 +71,7 @@ with st.expander("➕ Add a new flashcard", expanded=False):
             st.session_state.idx = len(st.session_state.cards) - 1
             st.session_state.show_answer = False
             st.success("Card added!")
-            st.experimental_rerun()
+            st.rerun()
         else:
             st.warning("Both fields are required.")
 
@@ -84,12 +84,12 @@ with col_prev:
     if st.button("⟨ Prev", disabled=st.session_state.idx == 0):
         st.session_state.idx -= 1
         st.session_state.show_answer = False
-        st.experimental_rerun()
+        st.rerun()
 with col_next:
     if st.button("Next ⟩", disabled=st.session_state.idx >= len(st.session_state.cards)-1):
         st.session_state.idx += 1
         st.session_state.show_answer = False
-        st.experimental_rerun()
+        st.rerun()
 
 card = st.session_state.cards[st.session_state.idx]
 st.progress((st.session_state.idx+1)/len(st.session_state.cards))
@@ -117,7 +117,7 @@ btn_col1, btn_col2, btn_col3 = st.columns([1,1,1])
 with btn_col1:
     if st.button("💡 Show Answer", use_container_width=True):
         st.session_state.show_answer = not st.session_state.show_answer
-        st.experimental_rerun()
+        st.rerun()
 with btn_col2:
     if st.button("🔊 Speak", use_container_width=True):
         tts_component(speak_text, key=f"tts2_{st.session_state.idx}")
@@ -144,7 +144,7 @@ with btn_col3:
             if st.session_state.idx < len(st.session_state.cards)-1:
                 st.session_state.idx += 1
             st.session_state.show_answer = False
-            st.experimental_rerun()
+            st.rerun()
         with g1:
             if st.button("Again", use_container_width=True):
                 update_card(0)
