@@ -103,7 +103,8 @@ st.markdown(
         min-height:180px;
         font-size:1.2rem;
         text-align:center;
-        background:#fafafa;">
+        background:#1a1a1a;
+        color:#ffffff;">
         <div>{card['front'] if not st.session_state.show_answer else card['back']}</div>
     </div>
     """,
