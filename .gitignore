@@ -1,0 +1,5 @@
+.streamlit/secrets.toml
+*.service_account.json
+firebase-*.json
+flashcards.json
+__pycache__/

@@ -1,1 +1,4 @@
 streamlit
+firebase-admin
+elevenlabs
+python-dotenv
