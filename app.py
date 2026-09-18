@@ -632,177 +632,80 @@ st.markdown("---")
 st.markdown("### 🔊 Auto Voice Reader")
 st.markdown("Reads through all filtered cards: **Question → 3s pause → Answer → 2s pause → next card**")
 
-def _build_autoplay_html(cards_data, voice, rate):
-    """Build an HTML component that auto-reads cards using browser TTS.
+if "autoplay_running" not in st.session_state:
+    st.session_state.autoplay_running = False
+if "autoplay_idx" not in st.session_state:
+    st.session_state.autoplay_idx = 0
 
-    Sequence per card:
-      1. Speak the question
-      2. Wait 3 seconds
-      3. Speak the answer
-      4. Wait 2 seconds
-      5. Move to next card
-    """
-    cards_json = json.dumps(cards_data)
-    html = f"""
-    <div id="ap-container" style="padding:16px; background:#111; border-radius:12px; color:#fff; font-family:sans-serif;">
-      <div style="display:flex; gap:10px; align-items:center; margin-bottom:12px;">
-        <button id="ap-play" onclick="apStart()" style="padding:10px 24px;background:#2d6a4f;color:#fff;border:none;border-radius:8px;font-size:1rem;cursor:pointer;">
-          ▶ Play
-        </button>
-        <button id="ap-pause" onclick="apPause()" style="padding:10px 24px;background:#d4a017;color:#fff;border:none;border-radius:8px;font-size:1rem;cursor:pointer;display:none;">
-          ⏸ Pause
-        </button>
-        <button id="ap-stop" onclick="apStop()" style="padding:10px 24px;background:#c0392b;color:#fff;border:none;border-radius:8px;font-size:1rem;cursor:pointer;display:none;">
-          ⏹ Stop
-        </button>
-      </div>
-      <div id="ap-status" style="font-size:0.9rem; color:#8be19a; min-height:24px;">Press Play to start auto-reading.</div>
-      <div id="ap-card" style="margin-top:10px; padding:16px; background:#1a1a2e; border-radius:8px; min-height:80px; display:none;">
-        <div id="ap-side" style="font-size:0.7rem; color:#52b788; text-transform:uppercase; letter-spacing:0.1em; margin-bottom:6px;"></div>
-        <div id="ap-text" style="font-size:1.15rem; line-height:1.5;"></div>
-      </div>
-      <div id="ap-progress" style="margin-top:8px; font-size:0.8rem; color:#888;"></div>
-    </div>
-    <script>
-    (function() {{
-      var cards = {cards_json};
-      var idx = 0;
-      var running = false;
-      var paused = false;
-      var timer = null;
+col1, col2, col3 = st.columns([1, 1, 2])
+with col1:
+    if st.button("▶ Start Autoplay", use_container_width=True) and not st.session_state.autoplay_running:
+        st.session_state.autoplay_running = True
+        st.session_state.autoplay_idx = 0
+        st.rerun()
+with col2:
+    if st.button("⏹ Stop", use_container_width=True) and st.session_state.autoplay_running:
+        st.session_state.autoplay_running = False
+        st.rerun()
 
-      function show(id) {{ document.getElementById(id).style.display = ''; }}
-      function hide(id) {{ document.getElementById(id).style.display = 'none'; }}
+status_ph = st.empty()
+card_ph = st.empty()
+audio_ph = st.empty()
 
-      function speak(text) {{
-        return new Promise(function(resolve) {{
-          if (!('speechSynthesis' in window)) {{ resolve(); return; }}
-          window.speechSynthesis.cancel();
-          var u = new SpeechSynthesisUtterance(text);
-          u.lang = 'en-US';
-          u.rate = 0.8;  // Slower, more natural
-          u.pitch = 0.9; // Slightly lower pitch
-          u.volume = 0.9;
-          // Try to use a more natural voice
-          var voices = window.speechSynthesis.getVoices();
-          var naturalVoice = voices.find(v =>
-            v.name.includes('Natural') ||
-            v.name.includes('Enhanced') ||
-            v.name.includes('Premium') ||
-            (v.name.includes('Google') && v.lang === 'en-US')
-          );
-          if (naturalVoice) u.voice = naturalVoice;
-          u.onend = function() {{ resolve(); }};
-          u.onerror = function() {{ resolve(); }};
-          window.speechSynthesis.speak(u);
-        }});
-      }}
+if st.session_state.autoplay_running:
+    if st.session_state.autoplay_idx < len(filtered):
+        idx = st.session_state.autoplay_idx
+        c = filtered[idx]
 
-      function wait(ms) {{
-        return new Promise(function(resolve) {{
-          timer = setTimeout(resolve, ms);
-        }});
-      }}
+        # Display Card UI
+        status_ph.markdown(f"**Card {idx + 1} / {len(filtered)}** — Reading Question...")
+        card_ph.markdown(f"""
+            <div style="border:2px solid #52b788; border-radius:12px; padding:1.5rem; text-align:center; background:#1a1a2e; color:#fff;">
+                <div style="font-size:0.7rem; color:#52b788; text-transform:uppercase; margin-bottom:0.8rem;">QUESTION</div>
+                <div style="font-size:1.2rem;">{c['front']}</div>
+            </div>
+        """, unsafe_allow_html=True)
 
-      function updateUI(side, text, cardIdx) {{
-        document.getElementById('ap-card').style.display = '';
-        document.getElementById('ap-side').textContent = side;
-        document.getElementById('ap-text').textContent = text;
-        document.getElementById('ap-progress').textContent = 'Card ' + (cardIdx + 1) + ' / ' + cards.length;
-      }}
+        # Get and play Question Audio
+        aud_bytes, aud_fmt = get_audio_bytes(c['front'], st.session_state.voice, st.session_state.rate)
+        if aud_bytes:
+            b64_audio = base64.b64encode(aud_bytes).decode()
+            audio_html = f'<audio autoplay><source src="data:{aud_fmt};base64,{b64_audio}" type="{aud_fmt}"></audio>'
+            audio_ph.markdown(audio_html, unsafe_allow_html=True)
 
-      async function playLoop() {{
-        running = true;
-        hide('ap-play');
-        show('ap-pause');
-        show('ap-stop');
+        # Wait for audio to finish + 3s pause
+        # We don't know exact duration, but we can do a rough estimate based on text length + 3s
+        # Average reading speed is ~15 chars/sec
+        est_duration_front = max(1, len(c['front']) / 15.0)
+        time.sleep(est_duration_front + 3)
+        audio_ph.empty()
 
-        while (idx < cards.length && running) {{
-          if (paused) {{
-            await wait(200);
-            continue;
-          }}
-          var c = cards[idx];
-          // Question
-          document.getElementById('ap-status').textContent = 'Reading question...';
-          updateUI('QUESTION', c.front, idx);
-          await speak(c.front);
-          if (!running) break;
+        # Display Answer
+        status_ph.markdown(f"**Card {idx + 1} / {len(filtered)}** — Reading Answer...")
+        card_ph.markdown(f"""
+            <div style="border:2px solid #d4a017; border-radius:12px; padding:1.5rem; text-align:center; background:#1a1a2e; color:#fff;">
+                <div style="font-size:0.7rem; color:#d4a017; text-transform:uppercase; margin-bottom:0.8rem;">ANSWER</div>
+                <div style="font-size:1.2rem;">{c['back']}</div>
+            </div>
+        """, unsafe_allow_html=True)
 
-          // 3 sec pause
-          document.getElementById('ap-status').textContent = 'Pause... (3s)';
-          await wait(3000);
-          if (!running) break;
+        # Get and play Answer Audio
+        aud_bytes_back, aud_fmt_back = get_audio_bytes(c['back'], st.session_state.voice, st.session_state.rate)
+        if aud_bytes_back:
+            b64_audio_back = base64.b64encode(aud_bytes_back).decode()
+            audio_html_back = f'<audio autoplay><source src="data:{aud_fmt_back};base64,{b64_audio_back}" type="{aud_fmt_back}"></audio>'
+            audio_ph.markdown(audio_html_back, unsafe_allow_html=True)
 
-          // Answer
-          document.getElementById('ap-status').textContent = 'Reading answer...';
-          updateUI('ANSWER', c.back, idx);
-          await speak(c.back);
-          if (!running) break;
+        est_duration_back = max(1, len(c['back']) / 15.0)
+        time.sleep(est_duration_back + 2)
+        audio_ph.empty()
 
-          // 2 sec pause
-          document.getElementById('ap-status').textContent = 'Next card in 2s...';
-          await wait(2000);
-          if (!running) break;
-
-          idx++;
-        }}
-
-        if (running) {{
-          document.getElementById('ap-status').textContent = '✅ Finished all ' + cards.length + ' cards!';
-        }}
-        apReset();
-      }}
-
-      function apReset() {{
-        running = false;
-        paused = false;
-        show('ap-play');
-        hide('ap-pause');
-        hide('ap-stop');
-      }}
-
-      window.apStart = function() {{
-        if (cards.length === 0) {{
-          document.getElementById('ap-status').textContent = 'No cards to read.';
-          return;
-        }}
-        idx = 0;
-        paused = false;
-        playLoop();
-      }};
-
-      window.apPause = function() {{
-        if (paused) {{
-          paused = false;
-          document.getElementById('ap-pause').textContent = '⏸ Pause';
-          document.getElementById('ap-status').textContent = 'Resumed...';
-        }} else {{
-          paused = true;
-          window.speechSynthesis.cancel();
-          document.getElementById('ap-pause').textContent = '▶ Resume';
-          document.getElementById('ap-status').textContent = 'Paused.';
-        }}
-      }};
-
-      window.apStop = function() {{
-        running = false;
-        paused = false;
-        if (timer) clearTimeout(timer);
-        window.speechSynthesis.cancel();
-        document.getElementById('ap-status').textContent = 'Stopped.';
-        document.getElementById('ap-card').style.display = 'none';
-        document.getElementById('ap-progress').textContent = '';
-        apReset();
-      }};
-    }})();
-    </script>
-    """
-    return html
-
-# Prepare card data for auto-play (only filtered, priority-sorted cards)
-autoplay_cards = [{"front": c["front"], "back": c["back"]} for c in filtered]
-autoplay_html = _build_autoplay_html(autoplay_cards, st.session_state.voice, st.session_state.rate)
-st.components.v1.html(autoplay_html, height=280)
+        # Move to next
+        st.session_state.autoplay_idx += 1
+        st.rerun()
+    else:
+        st.session_state.autoplay_running = False
+        status_ph.success("✅ Finished all cards!")
+        card_ph.empty()
 
 # End of else block for browse_mode
