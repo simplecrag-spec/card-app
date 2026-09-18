@@ -252,8 +252,12 @@ if "rate" not in st.session_state:
     st.session_state.rate = "-10%"
 if "meta" not in st.session_state:
     st.session_state.meta = load_meta()
-if "auto_play" not in st.session_state:
-    st.session_state.auto_play = False
+if "browse_mode" not in st.session_state:
+    st.session_state.browse_mode = False
+if "browse_subject" not in st.session_state:
+    st.session_state.browse_subject = ""
+if "browse_chapter" not in st.session_state:
+    st.session_state.browse_chapter = ""
 
 def _reload():
     st.session_state.cards = load_cards()
@@ -263,9 +267,9 @@ st.title("📚 Flashcards")
 
 # ---------- Sidebar ----------
 with st.sidebar:
-    st.markdown("### 🔊 Voice")
-    voice_label = st.selectbox("AI Voice (Edge, free)",
-        list(EDGE_VOICES.keys()), index=1)
+    st.markdown("### 🔊 Voice (Reading)")
+    voice_label = st.selectbox("Select voice",
+        list(EDGE_VOICES.keys()), index=1, label_visibility="collapsed")
     st.session_state.voice = EDGE_VOICES[voice_label]
     rate_pct = st.slider("Speed", -30, 30, -10)
     st.session_state.rate = f"{rate_pct}%"
@@ -328,15 +332,32 @@ with st.sidebar:
                 st.rerun()
 
     
-    # Subject / chapter summary
-    with st.expander("📋 Subject Contents", expanded=False):
+    # Subject / chapter summary with browse links
+    with st.expander("📋 Browse Cards", expanded=False):
         for s in sorted(subjects.keys()):
             sc = [c for c in st.session_state.cards if c.get("subject") == s]
             chapters = subjects[s]
-            st.markdown(f"**{s}** — {len(sc)} card(s)")
+            col1, col2 = st.columns([0.7, 0.3])
+            with col1:
+                st.markdown(f"**{s}** — {len(sc)} card(s)")
+            with col2:
+                if st.button(f"📋 Browse", key=f"browse_{s}", help=f"View all cards in {s}"):
+                    st.session_state.browse_mode = True
+                    st.session_state.browse_subject = s
+                    st.session_state.browse_chapter = ""
+                    st.rerun()
+
             for ch in sorted(chapters):
                 cc = [c for c in sc if c.get("chapter") == ch]
-                st.markdown(f"  └ {ch} — {len(cc)} card(s)")
+                col1, col2 = st.columns([0.7, 0.3])
+                with col1:
+                    st.markdown(f"  └ {ch} — {len(cc)} card(s)")
+                with col2:
+                    if st.button(f"📋", key=f"browse_{s}_{ch}", help=f"View all cards in {ch}"):
+                        st.session_state.browse_mode = True
+                        st.session_state.browse_subject = s
+                        st.session_state.browse_chapter = ch
+                        st.rerun()
 
     
 # ---------- Add card ----------
@@ -408,7 +429,65 @@ due_cards.sort(key=lambda x: x.get("next_review", ""))
 future_cards.sort(key=lambda x: x.get("next_review", ""))
 filtered = due_cards + future_cards
 
-# ---------- Main card view ----------
+# ---------- Main card view or browser view ----------
+if st.session_state.browse_mode:
+    # ===== CARD BROWSER VIEW =====
+    st.markdown("---")
+    col1, col2 = st.columns([0.8, 0.2])
+    with col1:
+        browse_title = f"📋 {st.session_state.browse_subject}"
+        if st.session_state.browse_chapter:
+            browse_title += f" › {st.session_state.browse_chapter}"
+        st.subheader(browse_title)
+    with col2:
+        if st.button("← Study", use_container_width=True):
+            st.session_state.browse_mode = False
+            st.rerun()
+
+    # Filter cards for browser view
+    browse_cards = [c for c in st.session_state.cards
+                   if c.get("subject") == st.session_state.browse_subject]
+    if st.session_state.browse_chapter:
+        browse_cards = [c for c in browse_cards
+                       if c.get("chapter") == st.session_state.browse_chapter]
+
+    st.markdown(f"**{len(browse_cards)} cards**")
+
+    if not browse_cards:
+        st.info("No cards in this category.")
+    else:
+        # Display cards in a grid
+        for i, card in enumerate(browse_cards):
+            with st.container():
+                col1, col2, col3 = st.columns([0.05, 0.8, 0.15])
+                with col1:
+                    st.markdown(f"**{i+1}**")
+                with col2:
+                    # Card preview
+                    front_preview = card["front"][:60] + ("..." if len(card["front"]) > 60 else "")
+                    back_preview = card["back"][:60] + ("..." if len(card["back"]) > 60 else "")
+
+                    with st.expander(f"**Q:** {front_preview}", expanded=False):
+                        st.markdown(f"**Question:** {card['front']}")
+                        st.markdown(f"**Answer:** {card['back']}")
+
+                        # Card stats
+                        nr = card.get("next_review", "")
+                        is_due = nr <= now_iso if nr else True
+                        due_status = "Due now" if is_due else f"Due {nr[:10]}"
+                        st.caption(f"Interval: {card.get('interval', 1)} days • {due_status}")
+
+                with col3:
+                    # Delete button
+                    if st.button("🗑", key=f"browse_del_{i}", help="Delete this card"):
+                        delete_card(card)
+                        st.session_state.cards = load_cards()
+                        st.rerun()
+
+                st.markdown("---")
+
+else:
+    # ===== NORMAL STUDY VIEW =====
 if not filtered:
     st.info("No flashcards match current filters. Add one above, or change filters.")
     st.stop()
@@ -725,3 +804,5 @@ def _build_autoplay_html(cards_data, voice, rate):
 autoplay_cards = [{"front": c["front"], "back": c["back"]} for c in filtered]
 autoplay_html = _build_autoplay_html(autoplay_cards, st.session_state.voice, st.session_state.rate)
 st.components.v1.html(autoplay_html, height=280)
+
+# End of else block for browse_mode
