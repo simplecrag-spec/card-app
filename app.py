@@ -484,10 +484,10 @@ if st.session_state.browse_mode:
                         st.session_state.cards = load_cards()
                         st.rerun()
 
-                st.markdown("---")
+            st.markdown("---")
+    st.stop()
 
-else:
-    # ===== NORMAL STUDY VIEW =====
+# ===== NORMAL STUDY VIEW =====
 if not filtered:
     st.info("No flashcards match current filters. Add one above, or change filters.")
     st.stop()
