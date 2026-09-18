@@ -1,12 +1,13 @@
-# 🗣️ Voice Flashcards — AI Voice Edition
+# 📚 Flashcards — Anki-style Study App
 
-Voice-enabled flashcard app with AI neural TTS, voice answer checking, voice card creation, and cloud storage.
+Flashcard app with hierarchical organization, auto-reading TTS loop, spaced repetition, and cloud storage.
 
 ## Features
+- 📚 **Anki-like Organization** — Subjects and Chapters hierarchy, easy to add more subcategories
+- 🔊 **Auto Voice Reader** — Sequential TTS loop that reads Question → 3s pause → Answer → 2s pause → next card
+- 🧠 **Spaced Repetition with Custom Intervals** — Anki-style Again/Hard/Good/Easy grading with custom repeat times
+- 🎯 **Priority Sorting** — Due cards appear first, automatically sorted by review date
 - 🔊 **AI Voice (Edge TTS, free & unlimited)** — Microsoft neural voices, no API key, no character limits
-- 🎙 **Voice Answer Checking (Web Speech API)** — speak your answer, app checks it
-- 🧠 **SM-2 Spaced Repetition** — Again / Hard / Good / Easy grading
-- 🔥 **Wake word "hey fresco"** — voice card creation flow
 - ☁️ **Supabase or Firebase** — persistent cloud storage, works with PC off
 - 📱 **Mobile-ready** — works on iOS Safari / Android Chrome
 
@@ -59,9 +60,15 @@ SUPABASE_KEY = "eyJhbGci..."
 
 ## Usage
 - **Review** — flip card, grade Again/Hard/Good/Easy
-- **Voice answer** — after showing answer, tap 🎙, speak your answer, paste it, tap "Check Answer"
-- **Voice create** — tap "Voice Create" → say question → say answer → card saved
+- **Auto Voice Reader** — plays through all filtered cards: Question → 3s pause → Answer → 2s pause → next card
+- **Subject/Chapter Hierarchy** — organize cards by subject and chapter subcategories
 - **AI voice** — automatically reads each card; speed control in sidebar
 
-## Voice wake word note
-"hey fresco" is the activation phrase. Tap the 🎤 button to activate mic (browsers require a tap for security), then say your question/answer as prompted.
+## Features
+✅ **Anki-like Organization** — Subjects and Chapters hierarchy, easy to add more subcategories  
+✅ **Auto Voice Reader Loop** — Sequential TTS: Question → 3s pause → Answer → 2s pause → next card  
+✅ **Spaced Repetition** — Anki-style Again/Hard/Good/Easy grading with custom repeat times  
+✅ **Priority Sorting** — Due cards appear first, sorted by review date  
+✅ **No Speech Recognition** — Removed voice detection/STT features for cleaner audio-only experience  
+✅ **Free TTS** — Microsoft Edge voices, no API key or limits  
+✅ **Cloud Storage** — Works with PC off (Supabase or Firebase)
