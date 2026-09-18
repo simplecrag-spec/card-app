@@ -222,20 +222,22 @@ def update_card_in_list(card):
         pass
     save_cards(st.session_state.cards)
 
-def delete_all_cards():
+def delete_card(card_id):
+    """Delete a single card by ID."""
     b = backend()
     try:
-        if b == "firebase":
-            for d in get_firestore().collection("flashcards").stream():
-                d.reference.delete()
+        if b == "firebase" and "_id" in card_id:
+            get_firestore().collection("flashcards").document(card_id["_id"]).delete()
             return
-        if b == "supabase":
-            get_supa().table(SUPA_TABLE).delete().neq("id", 0).execute()
+        if b == "supabase" and "_id" in card_id:
+            get_supa().table(SUPA_TABLE).delete().eq("id", int(card_id["_id"])).execute()
             return
     except Exception as e:
-        st.sidebar.warning(f"Cloud clear failed: {e}")
-    if os.path.exists("flashcards.json"):
-        os.remove("flashcards.json")
+        st.warning(f"Delete failed: {e}")
+    # fallback: remove from local
+    cards_list = load_cards()
+    cards_list = [c for c in cards_list if c.get("_id") != card_id.get("_id")]
+    save_cards(cards_list)
 
 # ================= SESSION STATE =================
 if "cards" not in st.session_state:
@@ -325,22 +327,7 @@ with st.sidebar:
                 save_meta(meta)
                 st.rerun()
 
-    # Delete subject / chapter
-    with st.expander("🗑 Remove Subject / Chapter", expanded=False):
-        del_subj = st.selectbox("Subject to remove", ["(none)"] + sorted(subjects.keys()), key="del_subj")
-        if del_subj != "(none)" and del_subj in subjects:
-            del_chap_opts = ["(none)", "⚠️ Delete entire subject"] + sorted(subjects.get(del_subj, []))
-            del_chap = st.selectbox("Chapter to remove", del_chap_opts, key="del_chap")
-            if st.button("🗑 Remove", use_container_width=True):
-                if del_chap == "⚠️ Delete entire subject":
-                    del meta["subjects"][del_subj]
-                    save_meta(meta)
-                    st.rerun()
-                elif del_chap != "(none)" and del_chap in meta["subjects"].get(del_subj, []):
-                    meta["subjects"][del_subj].remove(del_chap)
-                    save_meta(meta)
-                    st.rerun()
-
+    
     # Subject / chapter summary
     with st.expander("📋 Subject Contents", expanded=False):
         for s in sorted(subjects.keys()):
@@ -351,15 +338,7 @@ with st.sidebar:
                 cc = [c for c in sc if c.get("chapter") == ch]
                 st.markdown(f"  └ {ch} — {len(cc)} card(s)")
 
-    st.markdown("---")
-    if st.button("⚠️ Clear all cards"):
-        n = len(st.session_state.cards)
-        delete_all_cards()
-        st.session_state.cards = []
-        st.session_state.idx = None
-        st.info(f"Deleted {n} cards.")
-        st.rerun()
-
+    
 # ---------- Add card ----------
 with st.expander("➕ Add New Flashcard", expanded=False):
     meta = st.session_state.meta
@@ -447,10 +426,21 @@ nr = card.get("next_review", "")
 is_due = nr <= now_iso if nr else True
 due_label = "🟢 Due now" if is_due else f"⏳ Due {nr[:10]}"
 
-# subject/chapter breadcrumb
+# subject/chapter breadcrumb with delete button
 sc = card.get("subject", "General")
 ch = card.get("chapter", "")
-st.caption(f"📚 {sc}" + (f" › {ch}" if ch else "") + f"  •  {due_label}")
+col1, col2 = st.columns([0.85, 0.15])
+with col1:
+    st.caption(f"📚 {sc}" + (f" › {ch}" if ch else "") + f"  •  {due_label}")
+with col2:
+    if st.button("🗑", key=f"del_{card.get('_id', st.session_state.idx)}", help="Delete this card"):
+        idx = real_indices[st.session_state.idx]
+        delete_card(st.session_state.cards[idx])
+        _reload()
+        if st.session_state.idx >= len(filtered) - 1 and st.session_state.idx > 0:
+            st.session_state.idx -= 1
+        st.session_state.show_answer = False
+        st.rerun()
 
 # Stats bar
 st.markdown(f"**Card {st.session_state.idx + 1} / {len(filtered)}** — "
@@ -611,7 +601,18 @@ def _build_autoplay_html(cards_data, voice, rate):
           window.speechSynthesis.cancel();
           var u = new SpeechSynthesisUtterance(text);
           u.lang = 'en-US';
-          u.rate = 0.95;
+          u.rate = 0.8;  // Slower, more natural
+          u.pitch = 0.9; // Slightly lower pitch
+          u.volume = 0.9;
+          // Try to use a more natural voice
+          var voices = window.speechSynthesis.getVoices();
+          var naturalVoice = voices.find(v =>
+            v.name.includes('Natural') ||
+            v.name.includes('Enhanced') ||
+            v.name.includes('Premium') ||
+            (v.name.includes('Google') && v.lang === 'en-US')
+          );
+          if (naturalVoice) u.voice = naturalVoice;
           u.onend = function() {{ resolve(); }};
           u.onerror = function() {{ resolve(); }};
           window.speechSynthesis.speak(u);
